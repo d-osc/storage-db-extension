@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Storage DB",
+  "name": "Storage DB — DevTools panel",
   "version": "1.0.0",
-  "description": "DevTools panel to browse and edit LocalStorage, SessionStorage and Cookies — table & JSON views plus a JS scripting console.",
+  "description": "Browse & edit all page storage: Local, Session, IndexedDB, Cookies, Cache, Buckets, Privacy Sandbox — table, JSON and script views.",
+  "homepage_url": "https://github.com/d-osc/storage-db-extension",
   "devtools_page": "devtools.html",
   "icons": {
     "16": "icons/icon16.png",
