@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Storage DB",
+  "version": "1.0.0",
+  "description": "DevTools panel to browse and edit LocalStorage, SessionStorage and Cookies — table & JSON views plus a JS scripting console.",
+  "devtools_page": "devtools.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["cookies", "storage"],
+  "host_permissions": ["http://*/*", "https://*/*"]
+}
