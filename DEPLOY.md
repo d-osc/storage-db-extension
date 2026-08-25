@@ -1,6 +1,6 @@
 # วิธี Deploy ขึ้น Chrome Web Store (ทำตามทีละขั้น = ผ่าน 100%)
 
-Package พร้อมแล้ว: **`store-assets/storage-db-extension-v1.0.0.zip`** (manifest อยู่ที่ root ของ zip ตามที่ store กำหนด)
+Package พร้อมแล้ว: **`store-assets/storage-db-extension-v1.0.1.zip`** (manifest อยู่ที่ root ของ zip ตามที่ store กำหนด)
 
 ## ขั้นที่ 1 — สมัคร Developer Account (ครั้งเดียว, ต้องใช้บัญชี Google ของคุณ)
 
@@ -14,7 +14,7 @@ Package พร้อมแล้ว: **`store-assets/storage-db-extension-v1.0.0
 ## ขั้นที่ 2 — อัปโหลด
 
 1. เข้า https://chrome.google.com/webstore/devconsole
-2. กด **New item** → เลือกไฟล์ `storage-db-extension-v1.0.0.zip`
+2. กด **New item** → เลือกไฟล์ `storage-db-extension-v1.0.1.zip`
 3. ระบบจะสร้าง draft ให้ — ยังไม่ต้อง submit ให้กรอกข้อมูลก่อน
 
 ## ขั้นที่ 3 — กรอก Store listing
