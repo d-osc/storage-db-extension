@@ -920,6 +920,14 @@ function visibleRows() {
 }
 
 function render() {
+  try {
+    renderInner();
+  } catch (e) {
+    showError('Render error — ' + (e && e.message ? e.message : String(e)));
+  }
+}
+
+function renderInner() {
   renderSidebar();
   renderViewSwitch();
   renderToolbar();
@@ -1176,10 +1184,11 @@ function renderTable() {
 }
 
 function valueCell(r) {
-  const type = detectType(r.v);
-  let preview = r.v;
+  const raw = r.v !== undefined ? r.v : r.value;
+  const type = detectType(raw);
+  let preview = raw === null || raw === undefined ? '' : String(raw);
   if (type === 'json') {
-    try { preview = JSON.stringify(JSON.parse(r.v)); } catch (e) { /* keep raw */ }
+    try { preview = JSON.stringify(JSON.parse(preview)); } catch (e) { /* keep raw */ }
   }
   if (preview.length > 300) preview = preview.slice(0, 300) + '…';
   const td = el('td', { class: 'mono value-cell' + (type === 'json' ? ' is-json' : ''), title: 'Double-click to edit' }, preview);
