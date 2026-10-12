@@ -25,6 +25,11 @@ UI ธีม **Chrome DevTools dark** (palette จริงของ DevTools, �
 - **Script view** — console JS รันในหน้าเว็บที่ inspect (await ได้, IntelliSense) กด `Ctrl+Enter`
 - **Resize ได้ทุกแผง** — ลากขอบขวา sidebar (150–380px), ลากเส้นแบ่ง editor↔output (แนวตั้งตอนกว้าง / แนวนอนตอนแคบ) · **ดับเบิลคลิกที่เส้น = รีเซ็ต** · ค่าที่ตั้งจะจำไว้
 - **Auto refresh** — ข้อมูล Local/Session/Cookies/Extension Storage โหลดใหม่เองทุก 3 วินาที (ปิดได้), refresh อัตโนมัติเมื่อเปลี่ยนหน้าเว็บ
+- **Encrypt mode (AES)** 🔒 — ถอด/เข้ารหัสค่าใน Local/Session Storage ที่แอปเขียนไว้แบบ `CryptoJS.AES.encrypt(value, passphrase)` (AES-256-CBC, OpenSSL `Salted__` format — ตรวจอัตโนมัติจาก prefix `U2FsdGVkX1`) กดไอคอนกุญแจใส่ passphrase (เช่น username ของ user ที่ login หรือ fallback key ของแอป) แล้ว:
+  - **Table view** แสดงค่า decrypted พร้อม badge `aes` (Type ตรวจจากค่าที่ถอดแล้ว) — ถอดไม่สำเร็จ (passphrase ผิด) จะขึ้น marker แดง
+  - **แก้ไข** double-click จะเห็น plaintext — Save แล้ว**เข้ารหัสกลับอัตโนมัติ** (มี checkbox คุมต่อรายการ) หรือติ๊กออกเพื่อบันทึกเป็น plaintext
+  - **JSON view** กาง/แก้ค่า decrypted ได้ และ re-encrypt เฉพาะ key ที่เข้ารหัสอยู่เดิมตอน Save
+  - เข้ากันได้ 100% กับ crypto-js (ใช้ Web Crypto + EVP_BytesToKey MD5 แบบเดียวกัน — แอปอ่านค่าที่แก้กลับได้ทันที) เช่น `SecureLocalStorageService` ของ mychannel · passphrase เก็บไว้เฉพาะในเครื่อง
 
 ## Storage แต่ละชนิด
 
@@ -70,6 +75,7 @@ devtools.html/js       # สร้างแท็บ "Storage DB" ใน DevTool
 panel.html/css/js      # หน้า panel ทั้งหมด (views + การอ่าน/เขียนข้อมูล)
 libs/monaco/           # Monaco Editor 0.52 (MIT) — vendor ไว้ในตัว
 libs/monaco-worker.js  # worker bootstrap แบบ CSP-safe (MV3 บล็อก blob worker)
+libs/aes.js            # AES crypto-js compatible (Web Crypto + EVP_BytesToKey) สำหรับ encrypt mode
 icons/                 # ไอคอน extension
 tools/make-icons.js    # regenerate ไอคอน: node tools/make-icons.js
 tools/csp-server.py    # server จำลอง CSP ของ MV3 สำหรับทดสอบ local

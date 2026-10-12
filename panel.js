@@ -102,8 +102,8 @@ const AUTO_STORES = ['ls', 'ss', 'cookies', 'ext'];
 const COLS = {
   ls: [
     { id: 'key', label: 'Key', width: '22%', get: (r) => r.k, cls: 'key-cell' },
-    { id: 'value', label: 'Value', width: '46%', get: (r) => r.v },
-    { id: 'type', label: 'Type', width: '9%', get: (r) => detectType(r.v) },
+    { id: 'value', label: 'Value', width: '46%', get: (r) => dispV(r) },
+    { id: 'type', label: 'Type', width: '9%', get: (r) => detectType(dispV(r)) },
     { id: 'size', label: 'Size', width: '10%', get: (r) => r.size, numeric: true },
   ],
   cookies: [
@@ -265,6 +265,17 @@ async function setupMock() {
   ss.setItem('draft:form', JSON.stringify({ name: '', email: '' }));
   ss.setItem('debug:enabled', 'false');
 
+  // encrypted entries สำหรับลอง encrypt mode (key = fallback keys ตาม mychannel)
+  try {
+    if (window.SdbAes && typeof crypto !== 'undefined' && crypto.subtle) {
+      ls.setItem('app:user', await SdbAes.aesEncrypt(
+        JSON.stringify({ id: 1, username: 'somchai', role: 'admin' }), ENC_PRESETS[0]));
+      ls.setItem('app:secret-note', await SdbAes.aesEncrypt(
+        'internal only — แก้ shipping ก่อนปิดงาน', ENC_PRESETS[0]));
+      ss.setItem('otp:ref', await SdbAes.aesEncrypt('REF-88213', ENC_PRESETS[1]));
+    }
+  } catch (e) { /* crypto.subtle ไม่พร้อมใน context นี้ — ข้าม mock ส่วนนี้ */ }
+
   const day = 86400;
   MOCK_COOKIES = [
     { name: 'sid', value: 'S-7f3a9c2e1b', domain: 'demo.local', path: '/', expirationDate: Math.floor(Date.now() / 1000) + 7 * day, session: false, httpOnly: true, secure: true, sameSite: 'lax', size: 15 },
@@ -347,6 +358,53 @@ function chromeCookies(fn, arg) {
   });
 }
 
+/* ============================== encrypt mode ============================== */
+/* ถอด/เข้ารหัสค่า Local/Session Storage ที่แอปเข้ารหัสด้วย
+ * CryptoJS.AES.encrypt(value, passphrase) (OpenSSL "Salted__" format) —
+ * ตรวจ ciphertext ด้วย prefix "U2FsdGVkX1" เหมือน SecureLocalStorageService
+ * ของ mychannel (key จริงคือ username ของ user ที่ login, fallback เป็น constant ต่อ storage) */
+const ENC_PRESETS = ['mychannel-secure-local-storage', 'mychannel-secure-session-storage'];
+const ENC_PREFS_KEY = 'sdb:encrypt';
+const encState = { on: false, key: '' };
+
+function loadEncState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(ENC_PREFS_KEY) || '{}') || {};
+    encState.on = !!s.on;
+    encState.key = typeof s.key === 'string' ? s.key : '';
+  } catch (e) { /* keep defaults */ }
+}
+function saveEncState() {
+  try { localStorage.setItem(ENC_PREFS_KEY, JSON.stringify({ on: encState.on, key: encState.key })); } catch (e) { /* ignore */ }
+}
+/** mode เปิดใช้ได้จริง (= เปิด + มี key + มี crypto) */
+function encActive() {
+  return !!(encState.on && encState.key && window.SdbAes && typeof crypto !== 'undefined' && crypto.subtle);
+}
+/** row นี้เป็น ciphertext ที่ถอดรหัสสำเร็จ */
+function isEncRow(r) {
+  return !!(r && r.enc && !r.derr && typeof r.dv === 'string');
+}
+/** ค่าที่ใช้แสดงผล/แก้ไข — decrypted เมื่อถอดได้ ไม่งั้นค่าดิบ */
+function dispV(r) {
+  return isEncRow(r) ? r.dv : r.v;
+}
+
+/** decrypt ทุก row ที่เป็น ciphertext ตอนอ่าน storage (ตกผลลัพธ์ไว้ใน row เอง) */
+async function decryptRows(rows) {
+  await Promise.all(rows.map(async (r) => {
+    if (!SdbAes.looksEncrypted(r.v)) return;
+    r.enc = true;
+    try {
+      r.dv = await SdbAes.aesDecrypt(r.v, encState.key);
+    } catch (e) {
+      // key ไม่ตรง — แสดงเป็น ciphertext พร้อม marker, ไม่ถือว่าอ่านค่าสำเร็จ
+      r.dv = null;
+      r.derr = true;
+    }
+  }));
+}
+
 /* ============================== reads: web storage / cookies ============================== */
 function storageProp(store) { return store === 'ss' ? 'sessionStorage' : 'localStorage'; }
 
@@ -369,7 +427,9 @@ async function readStorage(store) {
   const raw = await evalInPage(expr);
   const parsed = JSON.parse(raw);
   if (parsed && parsed.__error) throw new Error(parsed.__error);
-  return parsed.map(([k, v, size]) => ({ k, v, size }));
+  const rows = parsed.map(([k, v, size]) => ({ k, v, size }));
+  if (encActive()) await decryptRows(rows);
+  return rows;
 }
 
 async function readCookies() {
@@ -975,6 +1035,12 @@ function renderToolbar() {
   const isTable = TABLE_STORES.includes(store);
   const isForm = FORM_STORES.includes(store);
   $('#searchBox').classList.toggle('hidden', !isTable);
+  const encBtn = $('#btnEncrypt');
+  encBtn.classList.toggle('hidden', !(store === 'ls' || store === 'ss'));
+  encBtn.classList.toggle('on', encActive());
+  encBtn.title = encActive()
+    ? 'Encrypt mode ON — AES values are shown decrypted (click to change the passphrase or turn off)'
+    : 'Encrypt mode — decrypt AES (crypto-js) values in Local/Session Storage';
   $('#btnAdd').classList.toggle('hidden', isForm || store === 'cache');
   $('#btnExport').classList.toggle('hidden', isForm);
   $('#btnClear').classList.toggle('hidden', isForm || store === 'cache' || store === 'buckets');
@@ -1147,7 +1213,7 @@ function renderTable() {
         if (c.id === 'value') { tr.append(valueCell(r)); continue; }
       }
       if (c.id === 'type') {
-        const t = detectType(r.v);
+        const t = detectType(dispV(r));
         tr.append(el('td', {}, el('span', { class: 'badge b-' + t, title: 'detected via JSON.parse' }, t)));
         continue;
       }
@@ -1185,6 +1251,30 @@ function renderTable() {
 
 function valueCell(r) {
   const raw = r.v !== undefined ? r.v : r.value;
+  const dblEdit = TABLE_STORES.includes(state.store) && state.store !== 'cache' && state.store !== 'buckets';
+
+  if (r.enc) {
+    const td = el('td', { class: 'mono value-cell' });
+    td.append(el('span', { class: 'badge b-aes', title: 'value is AES-encrypted in storage (crypto-js format)' }, 'aes'), ' ');
+    if (r.derr) {
+      td.classList.add('dec-failed');
+      td.title = 'Decryption failed (wrong passphrase?) — ciphertext:\n' + raw;
+      td.append(el('span', { class: 'dec-msg' }, '🔒 decrypt failed — wrong passphrase?'));
+    } else {
+      td.title = 'AES-encrypted in storage — shown decrypted · double-click to edit (re-encrypts on save)';
+      let preview = String(r.dv);
+      const type = detectType(preview);
+      if (type === 'json') {
+        td.classList.add('is-json');
+        try { preview = JSON.stringify(JSON.parse(preview)); } catch (e) { /* keep raw */ }
+      }
+      if (preview.length > 300) preview = preview.slice(0, 300) + '…';
+      td.append(preview);
+    }
+    if (dblEdit) td.addEventListener('dblclick', () => openItemModal(r));
+    return td;
+  }
+
   const type = detectType(raw);
   let preview = raw === null || raw === undefined ? '' : String(raw);
   if (type === 'json') {
@@ -1192,7 +1282,7 @@ function valueCell(r) {
   }
   if (preview.length > 300) preview = preview.slice(0, 300) + '…';
   const td = el('td', { class: 'mono value-cell' + (type === 'json' ? ' is-json' : ''), title: 'Double-click to edit' }, preview);
-  if (TABLE_STORES.includes(state.store) && state.store !== 'cache' && state.store !== 'buckets') {
+  if (dblEdit) {
     td.addEventListener('dblclick', () => openItemModal(r));
   }
   return td;
@@ -1215,6 +1305,10 @@ function renderStatus() {
   if (store === 'ls' || store === 'ss') {
     const total = state.data[store].reduce((a, r) => a + (r.size || 0), 0);
     text = state.data[store].length + ' items · ' + fmtSize(total) + host;
+    if (encActive()) {
+      const nEnc = state.data[store].filter((r) => r.enc).length;
+      text += ' · AES on' + (nEnc ? ' (' + nEnc + ' encrypted)' : '');
+    }
   } else if (store === 'cookies') {
     text = state.data.cookies.length + ' cookies' + host;
   } else if (store === 'idb') {
@@ -1422,10 +1516,11 @@ function rowsToJsonObject() {
   }
   const obj = {};
   for (const r of state.data[store] || []) {
+    const val = dispV(r);
     if (state.nested) {
-      try { obj[r.k] = JSON.parse(r.v); continue; } catch (e) { /* keep raw */ }
+      try { obj[r.k] = JSON.parse(val); continue; } catch (e) { /* keep raw */ }
     }
-    obj[r.k] = r.v;
+    obj[r.k] = val;
   }
   return obj;
 }
@@ -1465,21 +1560,27 @@ function saveJson() {
     toast('Root must be an object like { "key": "value" }');
     return;
   }
-  const current = new Map((state.data[state.store] || []).map((r) => [r.k, r.v]));
-  const set = [];
+  const current = new Map((state.data[state.store] || []).map((r) => [r.k, r]));
   const remove = [];
   let added = 0, updated = 0, removed = 0;
-  for (const [k, v] of Object.entries(parsed)) {
-    const sv = v === null || v === undefined ? 'null' : typeof v === 'object' ? JSON.stringify(v) : String(v);
-    if (!current.has(k)) added++;
-    else if (current.get(k) !== sv) updated++;
-    set.push([k, sv]);
-  }
   for (const k of current.keys()) {
     if (!Object.prototype.hasOwnProperty.call(parsed, k)) { remove.push(k); removed++; }
   }
   (async () => {
     try {
+      const set = [];
+      for (const [k, v] of Object.entries(parsed)) {
+        const sv = v === null || v === undefined ? 'null' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+        const orig = current.get(k);
+        let toStore = sv;
+        if (encActive() && orig && isEncRow(orig)) {
+          // key นี้เข้ารหัสอยู่ใน storage — ค่าที่แก้เป็น plaintext ต้องเข้ารหัสกลับก่อนลง
+          toStore = sv === orig.dv ? orig.v : await SdbAes.aesEncrypt(sv, encState.key);
+        }
+        if (!orig) added++;
+        else if (toStore !== orig.v) updated++;
+        set.push([k, toStore]);
+      }
       if (set.length || remove.length) await storageApply(state.store, { set, remove });
       state.jsonDirty = false;
       await refreshStore(state.store);
@@ -1715,7 +1816,10 @@ function openItemModal(existing) {
     const keyI = el('input', { type: 'text', spellcheck: 'false', placeholder: 'key' });
     keyI.value = existing ? existing.k : '';
     const valI = el('textarea', { rows: '12', spellcheck: 'false', placeholder: 'value — plain text, JSON, anything' });
-    valI.value = existing ? existing.v : '';
+    // encrypted entry → แสดง plaintext ที่ถอดแล้ว (ถอดไม่ได้จะเห็น ciphertext ตามที่เก็บจริง)
+    valI.value = existing ? dispV(existing) : '';
+    const encChk = encActive() ? el('input', { type: 'checkbox' }) : null;
+    if (encChk) encChk.checked = isEncRow(existing);
 
     const cancel = el('button', { type: 'button' }, 'Cancel');
     cancel.addEventListener('click', hideModal);
@@ -1725,7 +1829,13 @@ function openItemModal(existing) {
       if (!key) { err.textContent = 'Key is required.'; err.classList.remove('hidden'); return; }
       save.disabled = true;
       try {
-        const ops = { set: [[key, valI.value]] };
+        let value = valI.value;
+        if (encChk && encChk.checked) {
+          // ค่าเดิมไม่ได้แก้ → เก็บ ciphertext เดิมไว้เลย (ไม่สุ่ม salt ใหม่โดยไม่จำเป็น)
+          if (isEncRow(existing) && value === existing.dv) value = existing.v;
+          else value = await SdbAes.aesEncrypt(value, encState.key);
+        }
+        const ops = { set: [[key, value]] };
         if (existing && existing.k !== key) ops.remove = [existing.k];
         await storageApply(state.store, ops);
         hideModal();
@@ -1742,7 +1852,11 @@ function openItemModal(existing) {
       el('h3', {}, existing ? 'Edit entry' : 'New entry — ' + (state.store === 'ss' ? 'sessionStorage' : 'localStorage')),
       el('label', { class: 'fld' }, el('span', {}, 'Key'), keyI),
       el('label', { class: 'fld' }, el('span', {}, 'Value'), valI,
-        el('span', { class: 'hint' }, 'Stored exactly as text — use the JSON view or scripts to store structured data.')),
+        el('span', { class: 'hint' }, encActive()
+          ? 'Encrypted entries are shown decrypted and re-encrypted with your passphrase on Save (toggle below).'
+          : 'Stored exactly as text — use the JSON view or scripts to store structured data.')),
+      encChk ? el('div', { class: 'check-row' },
+        el('label', {}, encChk, 'Encrypt with AES before saving (crypto-js compatible)')) : null,
       err,
       el('div', { class: 'modal-actions' }, cancel, save),
     );
@@ -2001,6 +2115,56 @@ function openCookieModal(existing) {
         'httpOnly and expiration attributes work through the chrome.cookies API — script commands (document.cookie) cannot see or change httpOnly cookies.'),
       err,
       el('div', { class: 'modal-actions' }, cancel, save),
+    );
+  });
+}
+
+/* ============================== encrypt mode settings ============================== */
+function openEncryptModal() {
+  showModal((box) => {
+    const err = el('div', { class: 'form-error hidden' });
+    const onChk = el('input', { type: 'checkbox' });
+    onChk.checked = encState.on;
+    const presets = el('datalist', { id: 'encKeyPresets' });
+    for (const k of ENC_PRESETS) presets.append(el('option', { value: k }));
+    const keyI = el('input', {
+      type: 'text', spellcheck: 'false', list: 'encKeyPresets',
+      placeholder: 'passphrase the app encrypts with (e.g. username)',
+    });
+    keyI.value = encState.key;
+
+    const cancel = el('button', { type: 'button' }, 'Cancel');
+    cancel.addEventListener('click', hideModal);
+    const apply = el('button', { type: 'button', class: 'primary' }, 'Apply');
+    apply.addEventListener('click', async () => {
+      if (onChk.checked && !keyI.value.trim()) {
+        err.textContent = 'A passphrase is required to enable encrypt mode.';
+        err.classList.remove('hidden');
+        return;
+      }
+      apply.disabled = true;
+      encState.on = onChk.checked;
+      encState.key = keyI.value;
+      saveEncState();
+      hideModal();
+      await refreshAll();
+      toast(encActive()
+        ? 'Encrypt mode ON — AES values are shown decrypted, edits re-encrypt on Save'
+        : 'Encrypt mode off');
+    });
+
+    box.append(
+      el('h3', {}, 'Encrypt mode — AES (crypto-js compatible)'),
+      el('span', { class: 'hint', style: 'display:block;margin:2px 0 4px;color:var(--muted);font-size:11px;line-height:1.55' },
+        'Values written by CryptoJS.AES.encrypt(value, passphrase) — AES-256-CBC, OpenSSL "Salted__" format, ',
+        'detected by the U2FsdGVkX1 prefix — are shown decrypted in Table/JSON views and re-encrypted on Save. ',
+        'mychannel apps use the logged-in username as the passphrase; before login they fall back to the preset keys below.'),
+      el('div', { class: 'check-row' },
+        el('label', {}, onChk, 'Decrypt AES-encrypted values in Local/Session Storage')),
+      el('label', { class: 'fld' }, el('span', {}, 'Passphrase'), presets, keyI,
+        el('span', { class: 'hint' }, 'Kept in this browser only (panel localStorage) — never leaves the machine.')),
+      err,
+      el('div', { class: 'modal-actions' }, cancel, apply),
     );
   });
 }
@@ -2550,6 +2714,7 @@ function wireEvents() {
   });
 
   $('#btnRefresh').addEventListener('click', () => refreshStore(state.store));
+  $('#btnEncrypt').addEventListener('click', openEncryptModal);
   $('#btnAdd').addEventListener('click', () => openItemModal(null));
   $('#btnClear').addEventListener('click', clearAll);
   $('#btnExport').addEventListener('click', exportJson);
@@ -2629,6 +2794,7 @@ async function init() {
 }
 
 async function initInner() {
+  loadEncState();
   if (!REAL) await setupMock();
   window.__sdbErrors = [];
   const origErr = console.error.bind(console);

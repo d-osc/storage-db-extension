@@ -112,6 +112,9 @@ button.toggle:hover { background: var(--hover); color: var(--text); }
 button.toggle.on { color: var(--green); border-color: rgba(135, 206, 123, 0.45); background: var(--green-tint); }
 
 button.icon-only { padding: 2px 4px; }
+/* encrypt-mode toggle — lit green while decryption is active */
+#btnEncrypt.on { color: var(--green); background: var(--green-tint); }
+#btnEncrypt.on:hover { color: var(--green); background: rgba(135, 206, 123, 0.24); }
 
 .toolbar-sep { width: 1px; height: 16px; background: var(--divider); margin: 0 2px; flex: none; }
 
@@ -341,6 +344,10 @@ tr:hover .iconbtn { opacity: 1; }
 .b-boolean { color: var(--purple); background: var(--purple-tint); }
 .b-string { color: var(--muted); background: rgba(154, 160, 166, 0.12); }
 .b-empty { color: var(--muted); background: rgba(154, 160, 166, 0.07); font-style: italic; }
+/* encrypt mode — marks values that are AES-encrypted in storage */
+.b-aes { color: var(--orange); background: rgba(242, 153, 0, 0.14); }
+td.value-cell.dec-failed { color: var(--red); }
+td.value-cell.dec-failed .dec-msg { color: var(--red); font-style: italic; }
 
 .flags { display: flex; gap: 3px; justify-content: flex-start; }
 .flag { font: 9px var(--mono); border-radius: 2px; padding: 1px 4px; cursor: default; }
