@@ -101,8 +101,28 @@
   var SALTED = new Uint8Array([0x53, 0x61, 0x6c, 0x74, 0x65, 0x64, 0x5f, 0x5f]);
   var CIPHERTEXT_PREFIX = 'U2FsdGVkX1';
 
-  function looksEncrypted(v) {
-    return typeof v === 'string' && v.indexOf(CIPHERTEXT_PREFIX) === 0;
+  function looksEncrypted(v, prefix) {
+    return splitCipherValue(v, prefix) !== null;
+  }
+
+  /** แยกส่วน ciphertext ออกจากค่าใน storage ตาม prefix ที่ config ไว้ (default = 'U2FsdGVkX1')
+   * - prefix คือ default → ทั้ง value คือ ciphertext ของ crypto-js
+   * - prefix กำหนดเอง (เช่น 'enc:') → value = prefix + ciphertext ปกติ จึงตัด prefix ออกก่อน
+   * คืน base64 ciphertext หรือ null ถ้าไม่ match */
+  function splitCipherValue(v, prefix) {
+    var p = prefix && prefix.length ? prefix : CIPHERTEXT_PREFIX;
+    if (typeof v !== 'string' || v.indexOf(p) !== 0) return null;
+    if (p === CIPHERTEXT_PREFIX) return v;
+    var rest = v.slice(p.length);
+    if (rest.indexOf(CIPHERTEXT_PREFIX) === 0) return rest; // wrapper: enc:U2FsdGVkX1…
+    if (v.indexOf(CIPHERTEXT_PREFIX) === 0) return v; // prefix เป็นส่วนต้นของ default เอง — ใช้ทั้ง value
+    return rest; // ให้ aesDecrypt ตรวจและ throw เอง (โผล่เป็น marker ถอดไม่สำเร็จ)
+  }
+
+  /** เติม prefix กลับเข้าไปให้ตรงกับที่ config ก่อนเขียนลง storage */
+  function wrapCipher(ciphertextB64, prefix) {
+    var p = prefix && prefix.length ? prefix : CIPHERTEXT_PREFIX;
+    return p === CIPHERTEXT_PREFIX ? ciphertextB64 : p + ciphertextB64;
   }
 
   function subtle() {
@@ -156,6 +176,8 @@
     aesEncrypt: aesEncrypt,
     aesDecrypt: aesDecrypt,
     looksEncrypted: looksEncrypted,
+    splitCipherValue: splitCipherValue,
+    wrapCipher: wrapCipher,
     CIPHERTEXT_PREFIX: CIPHERTEXT_PREFIX,
     md5: md5, // เปิดไว้ทดสอบ
   };

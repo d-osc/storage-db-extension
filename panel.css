@@ -348,6 +348,25 @@ tr:hover .iconbtn { opacity: 1; }
 .b-aes { color: var(--orange); background: rgba(242, 153, 0, 0.14); }
 td.value-cell.dec-failed { color: var(--red); }
 td.value-cell.dec-failed .dec-msg { color: var(--red); font-style: italic; }
+/* per-key passphrase chips in the encrypt-mode settings modal */
+.enc-keys { gap: 6px; }
+.enc-keys .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 4px 1px 8px;
+  font: 10.5px var(--mono);
+  color: var(--text-dim);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.enc-keys .chip-x { border: none; background: none; color: var(--muted); min-height: 0; padding: 0 5px; font-size: 13px; line-height: 1; }
+.enc-keys .chip-x:hover { color: var(--red); background: none; }
 
 .flags { display: flex; gap: 3px; justify-content: flex-start; }
 .flag { font: 9px var(--mono); border-radius: 2px; padding: 1px 4px; cursor: default; }

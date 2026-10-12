@@ -30,6 +30,8 @@ UI ธีม **Chrome DevTools dark** (palette จริงของ DevTools, �
   - **แก้ไข** double-click จะเห็น plaintext — Save แล้ว**เข้ารหัสกลับอัตโนมัติ** (มี checkbox คุมต่อรายการ) หรือติ๊กออกเพื่อบันทึกเป็น plaintext
   - **JSON view** กาง/แก้ค่า decrypted ได้ และ re-encrypt เฉพาะ key ที่เข้ารหัสอยู่เดิมตอน Save
   - เข้ากันได้ 100% กับ crypto-js (ใช้ Web Crypto + EVP_BytesToKey MD5 แบบเดียวกัน — แอปอ่านค่าที่แก้กลับได้ทันที) เช่น `SecureLocalStorageService` ของ mychannel · passphrase เก็บไว้เฉพาะในเครื่อง
+  - **Decrypt ราย key** 🔑 — แถวที่เป็น ciphertext มีปุ่มกุญแจให้ถอดค่าเดียวด้วย passphrase ของ key นั้น (ใช้ได้แม้ไม่เปิด encrypt mode) ติ๊กจำได้ → key นั้นจะ auto-decrypt ด้วย passphrase ของตัวเองแทนตัว global (เหมาะกับหน้าที่แต่ละ key เข้ารหัสด้วย user คนละคน) — รายการ per-key ทั้งหมดดู/ลบได้ใน settings ของ encrypt mode
+  - **Ciphertext prefix ปรับได้** (default `U2FsdGVkX1` ตาม format ของ crypto-js) — ถ้าแอป mark ciphertext ด้วย prefix อื่น เช่น `enc:U2FsdGVkX1…` ให้ใส่ `enc:` ในช่อง Ciphertext prefix ได้ ค่าที่เขียนกลับจะถูกเติม prefix ตามที่ตั้งอัตโนมัติ
 
 ## Storage แต่ละชนิด
 
