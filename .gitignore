@@ -4,3 +4,6 @@ store-assets/*.zip
 # os junk
 Thumbs.db
 .DS_Store
+
+# unpacked build for local install
+dist/
